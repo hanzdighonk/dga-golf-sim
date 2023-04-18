@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard</title>
+</head>
+<body>
+    <table id="leaderboardTable">
+        <!-- Table header and structure -->
+    </table>
+    <button onclick="updateLeaderboard()">Update Leaderboard</button>
+
+    <script>
+        function updateLeaderboard() {
+            fetch('/api/leaderboard')
+                .then(response => response.json())
+                .then(data => {
+                    const table = document.getElementById('leaderboardTable');
+                    
+                    // Clear the existing table rows (except the header)
+                    while (table.rows.length > 1) {
+                        table.deleteRow(1);
+                    }
+
+                    // Populate the table with the updated leaderboard data
+                    for (const player_id in data) {
+                        const player = data[player_id];
+                        const row = table.insertRow(-1);
+                        
+                        // Add cells for each column (adjust as needed)
+                        const rankCell = row.insertCell(0);
+                        const playerCell = row.insertCell(1);
+                        const totalCell = row.insertCell(2);
+
+                        rankCell.textContent = player.Rank;
+                        playerCell.textContent = player.Player;
+                        totalCell.textContent = player.Total;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching leaderboard data:', error);
+                });
+        }
+    </script>
+</body>
+</html>
