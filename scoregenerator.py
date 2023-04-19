@@ -93,7 +93,7 @@ def roll_score(par, par3_bird_better, par4_bird_better, par5_bird_better, bogey_
         return par + 3  # Triple Bogey
 
     # Rare scores
-    return par + random.randint(4, 5)
+    return par + random.randint(3, 5)
 
 
 def create_score(golfer, par, par3, par4, par5, bogeyAvoid, course, condition):

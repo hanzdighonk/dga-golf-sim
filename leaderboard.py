@@ -833,7 +833,7 @@ def print_top_half(made_cut, leaderboard, playerData, rd):
     top_half = {}
     
     # Set the column header for the leaderboard
-    header = ['rank', 'player', 'total', 'thru', 'round', 'r1', 'r2', 'r3', 'r4', 'strokes']
+    header = ['Rank', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes']
 
     # Print the header and separator
     print_header(header)
@@ -907,14 +907,19 @@ def print_leaderboard(leaderboard, active_season, active_week, tournament, purse
         if hasCut and rd == 2:
             # Count the number of players tied at the cutline
             num_ties = len([p for p in leaderboard.values() if p['total'] == cut_score])
-            if counter <= cutline or (counter == cutline + num_ties and num_ties > 1):
+    
+            # Print player data and cutline if applicable
+            if counter < cutline or (counter <= cutline + num_ties and num_ties > 0):
                 print_player(player_id, leaderboard, playerData, rd)
                 if counter == cutline:
                     print_projected_cutline(cut_score)
-            elif counter > cutline + num_ties:
+            elif counter > cutline and counter <= cutline + num_ties:
+                print_player(player_id, leaderboard, playerData, rd)
+            else:
                 print_player(player_id, leaderboard, playerData, rd)
         else:
             print_player(player_id, leaderboard, playerData, rd)
+
 
 
         
@@ -925,10 +930,13 @@ def get_stats(scores_dict, hole_pars):
         'par5': {'ace': 0, 'alb': 0, 'eagle': 0, 'bird': 0, 'par': 0, 'bogie': 0, 'dbogie': 0, 'tbogie': 0, 'other': 0}
     }
     for player in scores_dict:
-        for round_score in scores_dict[player]:
-            for i in range(len(round_score)):
-                score = round_score[i]
-                par = hole_pars[i]
+        for rd in range(1, 5):  # Loop through rounds 1 to 4
+            round_key = f"r{rd}scores"
+            round_scores = scores_dict[player][round_key]
+            for hole_data in round_scores:
+                hole_number, score = hole_data
+                hole_index = hole_number - 1
+                par = hole_pars[hole_index]
                 if par == 3:
                     if score == 1:
                         stats['par3']['ace'] += 1
@@ -1029,8 +1037,8 @@ def reverse_field(tee_times):
 
 def playoff(leaderboard, hole_pars, golfer_instances, course, condition):
     # Check if there is a tie for first place
-    first_place_score = next(player["Total"] for player in leaderboard.values() if player["rank"] == 1)
-    tied_players = [player for player in leaderboard.values() if player["Total"] == first_place_score]
+    first_place_score = next(player["total"] for player in leaderboard.values() if player["rank"] == 1)
+    tied_players = [player for player in leaderboard.values() if player["total"] == first_place_score]
 
 
     if len(tied_players) > 1:
@@ -1039,23 +1047,23 @@ def playoff(leaderboard, hole_pars, golfer_instances, course, condition):
         hole_number = 1
         while len(tied_players) > 1:
             for player in tied_players:
-                golfer = golfer_instances[player["Player_id"]]
+                golfer = golfer_instances[player["player_id"]]
                 par = hole_pars[hole_number - 1]
                 par3 = golfer.par3
                 par4 = golfer.par4
                 par5 = golfer.par5
                 bogeyAvoid = golfer.bogeyAvoid
-                player["PlayoffScore"] = create_score(golfer, par, par3, par4, par5, bogeyAvoid, course, condition)
+                player["playoff_score"] = create_score(golfer, par, par3, par4, par5, bogeyAvoid, course, condition)
 
             # Print the scores of all players in the playoff
             
             print(f"Playoff hole {hole_number} results:")
             for player in tied_players:
-                print(f"{player['player']} - Score: {player['PlayoffScore']}")
+                print(f"{player['player']} - Score: {player['playoff_score']}")
             print()
             # Eliminate players who don't match the lowest score
-            lowest_playoff_score = min(player["PlayoffScore"] for player in tied_players)
-            tied_players = [player for player in tied_players if player["PlayoffScore"] == lowest_playoff_score]
+            lowest_playoff_score = min(player["playoff_score"] for player in tied_players)
+            tied_players = [player for player in tied_players if player["playoff_score"] == lowest_playoff_score]
 
             hole_number += 1
 
@@ -1065,108 +1073,6 @@ def playoff(leaderboard, hole_pars, golfer_instances, course, condition):
             print(f"Playoff winner: {winner['player']}")
 
     return leaderboard
-
-
-
-
-
-# def run_tournament():
-#     # Remove the line below, since you will be passing the connection as an argument
-#     conn = sqlite3.connect('golf2.db')
-#     c = conn.cursor()
-#     made_cut = {}
-#     missed_cut = {}
-#     playerData = {}
-#
-#     # Clear all scores
-#     # clear_scores(tid)
-#
-#     # Get active event id based on active_season and active_week
-#     c.execute("SELECT schedule_id FROM Schedule WHERE Season=? AND Week=?", (active_season, active_week))
-#     active_event_id = c.fetchone()[0]
-#     # print(active_event_id)
-#
-#     # Get schedule information
-#     tid, season, week, tournament, purse, fieldSize, hasCut, cutline = get_schedule_info(active_season, active_event_id)
-#
-#
-#     # Get player field
-#     field = get_field(fieldSize)
-#     #print("Field: ", field)
-#
-#     # print("selected players: ",field)
-#
-#     # Assign r1 tee times
-#     tee_times_dict, r1_tee_times, r2_tee_times = set_tee_times(field, 1, playerData)
-#     print_tee_times(r1_tee_times, 1)
-#
-#
-#     # Get course information
-#     course_id, course_name, hole_pars, hole_handicaps, total_par = get_course_info()
-#
-#     # initialize tournament    
-#     playerData = initialize_tournament(r1_tee_times, hole_pars)
-#
-#     # simulate r1
-#     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r1_tee_times, course_name, course_id, hole_pars, hole_handicaps, 1, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances)
-#
-#
-#     # print r2 tee times
-#     print_tee_times(r2_tee_times, 1)
-#     print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, 2, hasCut, cutline, activePlayers, playerData)
-#     # simulate r2
-#     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r2_tee_times, course_name, tid, hole_pars, hole_handicaps, 2, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances)
-#
-#     # process cut
-#     if hasCut:
-#          made_cut, missed_cut, leaderboard = process_cut(playerData, cutline, 3, leaderboard)      
-#
-#     # set tee times for r3
-#     r3_tee_times, r1_tee_times, r2_tee_times = set_tee_times(made_cut, 3, playerData)
-#     print_tee_times(r3_tee_times, 3)
-#     print_top_half(made_cut, leaderboard, playerData, 3)
-#     print_missed_cut(missed_cut, leaderboard, playerData, 3)
-#
-#     # simulate r3
-#     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r3_tee_times, course_name, tid, hole_pars, hole_handicaps, 3, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances)
-#
-#
-#     # set tee times for r4
-#     made_cut, missed_cut = get_cut_lists(playerData, leaderboard)
-#     r4_tee_times, r1_tee_times, r2_tee_times = set_tee_times(made_cut, 4, playerData)
-#     print_tee_times(r4_tee_times, 4)
-#     print_top_half(made_cut, leaderboard, playerData, 4)
-#     print_missed_cut(missed_cut, leaderboard, playerData, 4)
-#
-#     # simulate r4
-#     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r4_tee_times, course_name, tid, hole_pars, hole_handicaps, 4, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances)
-#     print()
-#
-#     # Run the playoff if necessary
-#     # Sort the made_cut list by total score in ascending order
-#     rank_1_players = [player for player in leaderboard.values() if player["rank"] == 1]
-#
-#     if len(rank_1_players) > 1:
-#         # Call the playoff function with the sorted leaderboard
-#         leaderboard = playoff(leaderboard, hole_pars, golfer_instances)
-#
-#     # Print the final leaderboard
-#     print("\nFinal Leaderboard:")
-#     #print(leaderboard)
-# #    for player_id, player in leaderboard.items():
-#         #print(f"{player['rank']} - {player['player']} - {player['total']}")
-#
-#     # get stats
-#     # stats = get_stats(playerData, hole_pars)
-#     #
-#     # # print stats
-#     # headers = ['Ace', 'Alb', 'Eagle', 'Bird', 'Par', 'Bogie', 'DBogie', 'TBogie', 'Other']
-#     # print_stats(stats, headers)
-#
-#     return leaderboard
-
-
-
 
 
 def main():
@@ -1275,12 +1181,12 @@ def main():
 #    for player_id, player in leaderboard.items():
         #print(f"{player['rank']} - {player['player']} - {player['total']}")
 
-    # get stats
-    # stats = get_stats(playerData, hole_pars)
-    #
-    # # print stats
-    # headers = ['Ace', 'Alb', 'Eagle', 'Bird', 'Par', 'Bogie', 'DBogie', 'TBogie', 'Other']
-    # print_stats(stats, headers)
+    #get stats
+    stats = get_stats(playerData, hole_pars)
+    
+    #print stats
+    headers = ['Ace', 'Alb', 'Eagle', 'Bird', 'Par', 'Bogie', 'DBogie', 'TBogie', 'Other']
+    print_stats(stats, headers)
 
 #    conn.close()
 
