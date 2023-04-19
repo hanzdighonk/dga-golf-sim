@@ -201,53 +201,53 @@ def reroll_if_needed(score, par, golfer, par3, par4, par5, bogeyAvoid, course, c
                 worst_golfer = golfer.name
         else:
             print(f"Reroll skipped: {golfer.name} - Rerolls used: {golfer.reroll_count} - Org: {score}")
-    print()
-    print(f"Best improvement: {best_golfer} with {best_improvement} strokes")
-    print(f"Worst improvement: {worst_golfer} with {worst_improvement} strokes")
-    print()
+    # print()
+    # print(f"Best improvement: {best_golfer} with {best_improvement} strokes")
+    # print(f"Worst improvement: {worst_golfer} with {worst_improvement} strokes")
+    # print()
     return score
 
 
-# Test data
-golfers = get_golfers_from_db()
-hard = "hard"
-normal = "normal"
-easy = "easy"
-
-#par = 3
-par3_bird_better = 24.22
-par4_bird_better = 24.18
-par5_bird_better = 57.5
-bogey_avoid = 11.95
-
-# Generate 1000 scores for Par 3 holes
-scores3 = [roll_score(3, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, hard, hard) for _ in range(132)]
-scores4 = [roll_score(4, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, hard, hard) for _ in range(132)]
-scores5 = [roll_score(5, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, hard, hard) for _ in range(132)]
-
-# Count the occurrences of each score
-score_counts3 = Counter(scores3)
-score_counts4 = Counter(scores4)
-score_counts5 = Counter(scores5)
-
-# Calculate the average scores
-average_score3 = np.mean(scores3)
-average_score4 = np.mean(scores4)
-average_score5 = np.mean(scores5)
-
-# Print the results
-print("Generated scores for 1000 Par 3 holes:")
-for score, count in sorted(score_counts3.items()):
-    print(f"Score {score}: {count} times")
-print(f"Average Score for Par 3 holes: {average_score3:.2f}\n")
-
-print("Generated scores for 1000 Par 4 holes:")
-for score, count in sorted(score_counts4.items()):
-    print(f"Score {score}: {count} times")
-print(f"Average Score for Par 4 holes: {average_score4:.2f}\n")
-
-print("Generated scores for 1000 Par 5 holes:")
-for score, count in sorted(score_counts5.items()):
-    print(f"Score {score}: {count} times")
-print(f"Average Score for Par 5 holes: {average_score5:.2f}")
+# # Test data
+# golfers = get_golfers_from_db()
+# hard = "hard"
+# normal = "normal"
+# easy = "easy"
+#
+# #par = 3
+# par3_bird_better = 24.22
+# par4_bird_better = 24.18
+# par5_bird_better = 57.5
+# bogey_avoid = 11.95
+#
+# # Generate 1000 scores for Par 3 holes
+# scores3 = [roll_score(3, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, hard, hard) for _ in range(132)]
+# scores4 = [roll_score(4, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, hard, hard) for _ in range(132)]
+# scores5 = [roll_score(5, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, hard, hard) for _ in range(132)]
+#
+# # Count the occurrences of each score
+# score_counts3 = Counter(scores3)
+# score_counts4 = Counter(scores4)
+# score_counts5 = Counter(scores5)
+#
+# # Calculate the average scores
+# average_score3 = np.mean(scores3)
+# average_score4 = np.mean(scores4)
+# average_score5 = np.mean(scores5)
+#
+# # Print the results
+# print("Generated scores for 1000 Par 3 holes:")
+# for score, count in sorted(score_counts3.items()):
+#     print(f"Score {score}: {count} times")
+# print(f"Average Score for Par 3 holes: {average_score3:.2f}\n")
+#
+# print("Generated scores for 1000 Par 4 holes:")
+# for score, count in sorted(score_counts4.items()):
+#     print(f"Score {score}: {count} times")
+# print(f"Average Score for Par 4 holes: {average_score4:.2f}\n")
+#
+# print("Generated scores for 1000 Par 5 holes:")
+# for score, count in sorted(score_counts5.items()):
+#     print(f"Score {score}: {count} times")
+# print(f"Average Score for Par 5 holes: {average_score5:.2f}")
 
