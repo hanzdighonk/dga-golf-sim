@@ -9,25 +9,22 @@ worst_improvement = 0
 best_golfer = None
 worst_golfer = None
 
-course_difficulty_multipliers = {
-    "easy": 1.3,
-    "normal": 1,
-    "hard": 0.7
-}
 
-condition_difficulty_multipliers = {
-    "easy": 1.3,
-    "normal": 1,
-    "hard": 0.7
-}
+def calculate_multiplier(difficulty):
+    slope = -1 / 9
+    intercept = 14 / 9
+    multiplier = (slope * difficulty) + intercept
+    return multiplier
 
 def roll_score(par, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, course_difficulty, condition_difficulty):
     roll = random.randint(1, 10000)
     birdie_better_pct = 0
     bogey_pct = bogey_avoid
 
-    course_multiplier = course_difficulty_multipliers[course_difficulty]
-    condition_multiplier = condition_difficulty_multipliers[condition_difficulty]
+    course_multiplier = calculate_multiplier(course_difficulty)
+    condition_multiplier = calculate_multiplier(condition_difficulty)
+    print("Course Multi: ",course_multiplier)
+    print("Condition Multi: ",course_multiplier)
     
     if par == 3:
         birdie_better_pct = par3_bird_better * course_multiplier * condition_multiplier
@@ -46,7 +43,11 @@ def roll_score(par, par3_bird_better, par4_bird_better, par5_bird_better, bogey_
         eagle = birdie_better_pct * 0.15
         birdie = birdie_better_pct * 0.85
         par_pct = 100 - birdie_better_pct - bogey_pct
-
+    
+    print("Birdie better: ", birdie_better_pct)
+    print("par: ", par_pct)
+    
+    
     cum_prob = 0
     if par == 3:
         cum_prob += hole_in_one

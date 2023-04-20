@@ -254,6 +254,7 @@ def initialize_tournament(tee_times, hole_pars):
         playerData[pid] = {
             "player_id": pid,
             "name": tee_time['name'],
+            "rank": 0,
             "start_time": datetime.strptime(tee_time['tee_time'], "%I:%M %p"),
             "start_hole": start_hole,
             "current_hole": start_hole if start_hole == 1 else 10,
@@ -268,7 +269,8 @@ def initialize_tournament(tee_times, hole_pars):
             "hole_pars": hole_pars,
             "make_cut": 0,
             "human": all_players_dict[pid]["human"],
-            "total_strokes": 0
+            "total_strokes": 0,
+            "start_rank_set": False
         }
         leaderboard[pid] = {
             'rank': 0,
@@ -292,6 +294,11 @@ def initialize_tournament(tee_times, hole_pars):
 ## loops endlessly likely due to finished = false for players that aren't in activePlayers
 def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard):
     
+    for id in playerData:
+        if playerData[id]['started'] == False and not playerData[id].get('start_rank_set', False):
+            leaderboard[id]['start_rank'] = playerData[id]['rank']
+            playerData[id]['start_rank_set'] = True
+
 
     # Set the current time to the time of the first tee time
     if rd in [1, 2]:
@@ -332,12 +339,10 @@ def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps,
         for id in activePlayers:
             # Check if the current time equals the golfer's start time
             if current_time > playerData[id]["start_time"]:
-                # Set started to True, update start_rank and movement only if not started yet
+                # Set started to True
                 if not playerData[id]["started"]:
                     playerData[id]["started"] = True
-                    if rd > 1:
-                        leaderboard[id]['start_rank'] = leaderboard[id]['rank']
-                        leaderboard[id]['movement'] = 0
+
 
         for id in activePlayers:
             if playerData[id]["started"] and not playerData[id]["finished"]:
@@ -358,9 +363,9 @@ def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps,
         
         # Print leaderboard
         if rd in [1,2]:
-            print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, hasCut, cutline, activePlayers, playerData, sorted_players)
+            print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, hasCut, cutline, activePlayers, playerData, sorted_players, current_time)
         else:
-            print_top_half(made_cut, leaderboard, playerData, rd)
+            print_top_half(made_cut, leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, playerData, current_time)
             print_missed_cut(missed_cut, leaderboard, playerData, rd)
         html_leaderboard = update_leaderboard_html(leaderboard, playerData, rd)
 
@@ -373,6 +378,7 @@ def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps,
         playerData[id]["started"] = False
         playerData[id]["finished"] = False
         playerData[id]["total_holes"] = 0
+        playerData[id]['start_rank_set'] = False
     return playerData, activePlayers, leaderboard, html_leaderboard
 
 def human_input_scores(player_id, hole_number, playerData, rd):
@@ -654,6 +660,8 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
             'make_cut': player_data['make_cut']
         })
 
+
+
             
     # Create a list of players sorted by total score in ascending order
     sorted_players = sorted(leaderboard.items(), key=lambda x: x[1]['total'])
@@ -675,6 +683,7 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
             ties += 1
 
         leaderboard[player_id]['rank'] = rank
+        playerData[player_id]['rank'] = rank
         prev_score = player_data['total']
 
     # Second iteration: Rank players who missed the cut
@@ -691,6 +700,7 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
                 ties += 1
 
             leaderboard[player_id]['rank'] = rank
+            playerData[player_id]['rank'] = rank
             prev_score = player_data['total']
 
 
@@ -848,7 +858,24 @@ def print_projected_cutline(cut_index):
     print('-' * 72)
 
 
-def print_top_half(made_cut, leaderboard, playerData, rd):
+def print_top_half(made_cut, leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, playerData, current_time):
+    formatted_time = current_time.strftime("%I:%M%p")
+    
+    if rd == 1:
+        day = "Thursday"
+    elif rd == 2:
+        day = "Friday"
+    elif rd == 3:
+        day = "Saturday"
+    else:
+        day = "Sunday"
+        
+    # Print the season and week of the tournament
+    print(f"\nSeason: {active_season}\nWeek: {active_week}\n")
+    # Print the tournament name, course name, and total par
+    print(f"Tournament: {tournament}\nCourse: {course_name}\nPar: {total_par}\n\nPurse: {purse}\n")
+    print(f"Current Time: {day} - {formatted_time}\n")
+    
     # Create a dictionary to hold the data for the players who made the cut
     top_half = {}
     
@@ -907,11 +934,23 @@ def calculate_cut(leaderboard, has_cut, cutline):
     return cut_score, made_cut
 
 
-def print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, hasCut, cutline, activePlayers, playerData, sorted_players):
+def print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, hasCut, cutline, activePlayers, playerData, sorted_players, current_time):
+    formatted_time = current_time.strftime("%I:%M%p")
+    
+    if rd == 1:
+        day = "Thursday"
+    elif rd == 2:
+        day = "Friday"
+    elif rd == 3:
+        day = "Saturday"
+    else:
+        day = "Sunday"
+        
     # Print the season and week of the tournament
     print(f"\nSeason: {active_season}\nWeek: {active_week}\n")
     # Print the tournament name, course name, and total par
     print(f"Tournament: {tournament}\nCourse: {course_name}\nPar: {total_par}\n\nPurse: {purse}\n")
+    print(f"Current Time: {day} - {formatted_time}\n")
 
     # Set the column header for the leaderboard
     header = ['Rank', '↑↓', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes']
@@ -1133,8 +1172,8 @@ def main():
     playerData, leaderboard = initialize_tournament(r1_tee_times, hole_pars)
     
     #course_difficulty & condition
-    course_difficulty = "normal"
-    course_condition = "normal"
+    course_difficulty = 1
+    course_condition = 10
 
     
     # simulate r1
@@ -1147,8 +1186,8 @@ def main():
     #print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, 2, hasCut, cutline, activePlayers, playerData, sorted_players)
 
     #course_difficulty & condition
-    course_difficulty = "normal"
-    course_condition = "hard"
+    course_difficulty = 1
+    course_condition = 10
 
 
     
@@ -1161,8 +1200,8 @@ def main():
 
 
     #course_difficulty & condition
-    course_difficulty = "normal"
-    course_condition = "hard"
+    course_difficulty = 1
+    course_condition = 10
 
     
     # set tee times for r3
@@ -1170,8 +1209,7 @@ def main():
     print_tee_times(r3_tee_times, rd)
     reset_movement(leaderboard, rd)
     input("Press any key to continue...")
-    print_top_half(made_cut, leaderboard, playerData, rd)
-    print_missed_cut(missed_cut, leaderboard, playerData, rd)
+
 
     # simulate r3
     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r3_tee_times, course_name, tid, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
@@ -1183,12 +1221,11 @@ def main():
     print_tee_times(r4_tee_times, rd)
     reset_movement(leaderboard, rd)
     input("Press any key to continue...")
-    print_top_half(made_cut, leaderboard, playerData, rd)
-    print_missed_cut(missed_cut, leaderboard, playerData, rd)
+
 
     #course_difficulty & condition
-    course_difficulty = "normal"
-    course_condition = "hard"
+    course_difficulty = 1
+    course_condition = 10
 
     # simulate r4
     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r4_tee_times, course_name, tid, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
