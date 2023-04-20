@@ -331,14 +331,12 @@ def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps,
         # Check if any golfers have started playing
         for id in activePlayers:
             # Check if the current time equals the golfer's start time
-            if current_time > playerData[id]["start_time"]:
-                # Set started to True, update start_rank and movement only if not started yet
-                if not playerData[id]["started"]:
-                    playerData[id]["started"] = True
-                    if rd > 1:
-                        leaderboard[id]['start_rank'] = leaderboard[id]['rank']
-                        leaderboard[id]['movement'] = 0
-
+            if current_time == playerData[id]["start_time"]:
+                # Set started to True
+                playerData[id]["started"] = True
+                if rd > 1:
+                    leaderboard[id]['start_rank'] = leaderboard[id]['rank']
+                    leaderboard[id]['movement'] = 0
         for id in activePlayers:
             if playerData[id]["started"] and not playerData[id]["finished"]:
                 if playerData[id]['human']:
@@ -618,6 +616,10 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
         current_hole = playerData[player_id]['current_hole']
         last_hole_index = hole_order.index(current_hole)
         makecut = 0
+        if rd > 1:
+            movement = leaderboard[player_id]['start_rank'] - leaderboard[player_id]['rank']
+        else:
+            movement = 0
     
         if playerData[player_id]['finished']:
             last_hole = "F"
@@ -640,7 +642,7 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
         total_score = player_data['total_score']
         leaderboard[player_id].update({
             'rank': rank,
-            'movement': 0,
+            'movement': movement,
             'player_id': player_id,
             'player': player_data['name'],
             'total': total_score,
@@ -653,10 +655,11 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
             'strokes': player_data['total_strokes'],
             'make_cut': player_data['make_cut']
         })
-
-            
+        
     # Create a list of players sorted by total score in ascending order
     sorted_players = sorted(leaderboard.items(), key=lambda x: x[1]['total'])
+
+
 
     # Assign rank to each player based on their position in the sorted list
     rank = 1
@@ -694,11 +697,6 @@ def calculate_leaderboard(playerData, rd, activePlayers, missed_cut, leaderboard
             prev_score = player_data['total']
 
 
-    if rd > 1:
-        for player_id, player_data in leaderboard.items():
-            movement = player_data['start_rank'] - player_data['rank']
-            leaderboard[player_id]['movement'] = movement
-            
     return leaderboard, r3r4Field, sorted_players
 
 
@@ -924,16 +922,22 @@ def print_leaderboard(leaderboard, active_season, active_week, tournament, purse
 
     # Print the leaderboard for all players
     counter = 0
-    cutline_printed = False
-    
     for player_id, player_data in sorted_players:
         counter += 1
+        # If there is a cut and it is the second round, print the projected cut line
         if hasCut and rd == 2:
-            if not cutline_printed and player_data['total'] > cut_score:
-                print_projected_cutline(cut_score)
-                cutline_printed = True
+            # Count the number of players tied at the cutline
+            num_ties = len([p for p in leaderboard.values() if p['total'] == cut_score])
     
-            print_player(player_id, leaderboard, playerData, rd)
+            # Print player data and cutline if applicable
+            if counter < cutline or (counter <= cutline + num_ties and num_ties > 0):
+                print_player(player_id, leaderboard, playerData, rd)
+                if counter == cutline:
+                    print_projected_cutline(cut_score)
+            elif counter > cutline and counter <= cutline + num_ties:
+                print_player(player_id, leaderboard, playerData, rd)
+            else:
+                print_player(player_id, leaderboard, playerData, rd)
         else:
             print_player(player_id, leaderboard, playerData, rd)
 
@@ -1138,7 +1142,7 @@ def main():
 
     
     # simulate r1
-    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r1_tee_times, course_name, course_id, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
+    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r1_tee_times, course_name, course_id, hole_pars, hole_handicaps, 1, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
     rd += 1
     # print r2 tee times
     print_tee_times(r2_tee_times, rd)
@@ -1153,45 +1157,45 @@ def main():
 
     
     # simulate r2
-    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r2_tee_times, course_name, tid, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
+    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r2_tee_times, course_name, tid, hole_pars, hole_handicaps, 2, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
     rd += 1
     # process cut
     if hasCut:
-         made_cut, missed_cut, leaderboard = process_cut(playerData, cutline, rd, leaderboard)      
+         made_cut, missed_cut, leaderboard = process_cut(playerData, cutline, 3, leaderboard)      
 
 
     #course_difficulty & condition
     course_difficulty = "normal"
-    course_condition = "hard"
+    course_condition = "easy"
 
     
     # set tee times for r3
-    r3_tee_times, r1_tee_times, r2_tee_times = set_tee_times(made_cut, rd, playerData)
+    r3_tee_times, r1_tee_times, r2_tee_times = set_tee_times(made_cut, 3, playerData)
     print_tee_times(r3_tee_times, rd)
     reset_movement(leaderboard, rd)
     input("Press any key to continue...")
-    print_top_half(made_cut, leaderboard, playerData, rd)
-    print_missed_cut(missed_cut, leaderboard, playerData, rd)
+    print_top_half(made_cut, leaderboard, playerData, 3)
+    print_missed_cut(missed_cut, leaderboard, playerData, 3)
 
     # simulate r3
-    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r3_tee_times, course_name, tid, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
+    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r3_tee_times, course_name, tid, hole_pars, hole_handicaps, 3, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
     rd += 1
 
     # set tee times for r4
     made_cut, missed_cut = get_cut_lists(playerData, leaderboard)
-    r4_tee_times, r1_tee_times, r2_tee_times = set_tee_times(made_cut, rd, playerData)
+    r4_tee_times, r1_tee_times, r2_tee_times = set_tee_times(made_cut, 4, playerData)
     print_tee_times(r4_tee_times, rd)
     reset_movement(leaderboard, rd)
     input("Press any key to continue...")
-    print_top_half(made_cut, leaderboard, playerData, rd)
-    print_missed_cut(missed_cut, leaderboard, playerData, rd)
+    print_top_half(made_cut, leaderboard, playerData, 4)
+    print_missed_cut(missed_cut, leaderboard, playerData, 4)
 
     #course_difficulty & condition
-    course_difficulty = "normal"
+    course_difficulty = "hard"
     course_condition = "hard"
 
     # simulate r4
-    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r4_tee_times, course_name, tid, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
+    playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r4_tee_times, course_name, tid, hole_pars, hole_handicaps, 4, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
     print()
 
     # Run the playoff if necessary
