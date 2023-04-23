@@ -16,16 +16,26 @@ def calculate_multiplier(difficulty):
     multiplier = (slope * difficulty) + intercept
     return multiplier
 
-def roll_score(par, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, course_difficulty, condition_difficulty):
+def roll_score(par, hcp, par3_bird_better, par4_bird_better, par5_bird_better, bogey_avoid, course_difficulty, condition_difficulty):
     roll = random.randint(1, 10000)
     birdie_better_pct = 0
     bogey_pct = bogey_avoid
 
     course_multiplier = calculate_multiplier(course_difficulty)
     condition_multiplier = calculate_multiplier(condition_difficulty)
-    print("Course Multi: ",course_multiplier)
-    print("Condition Multi: ",course_multiplier)
-    
+
+    # Adjust the course_multiplier based on the hole handicap
+    if 1 <= hcp <= 3:
+        course_multiplier *= 0.8
+    elif 4 <= hcp <= 7:
+        course_multiplier *= 0.9
+    elif 8 <= hcp <= 11:
+        course_multiplier *= 1
+    elif 12 <= hcp <= 15:
+        course_multiplier *= 1.1
+    elif 16 <= hcp <= 18:
+        course_multiplier *= 1.2
+
     if par == 3:
         birdie_better_pct = par3_bird_better * course_multiplier * condition_multiplier
         hole_in_one = birdie_better_pct * 0.01
@@ -43,9 +53,10 @@ def roll_score(par, par3_bird_better, par4_bird_better, par5_bird_better, bogey_
         eagle = birdie_better_pct * 0.15
         birdie = birdie_better_pct * 0.85
         par_pct = 100 - birdie_better_pct - bogey_pct
+
     
-    print("Birdie better: ", birdie_better_pct)
-    print("par: ", par_pct)
+    #print("Birdie better: ", birdie_better_pct)
+    #print("par: ", par_pct)
     
     
     cum_prob = 0
@@ -97,13 +108,13 @@ def roll_score(par, par3_bird_better, par4_bird_better, par5_bird_better, bogey_
     return par + random.randint(3, 5)
 
 
-def create_score(golfer, par, par3, par4, par5, bogeyAvoid, course, condition):
+def create_score(golfer, par, hcp, par3, par4, par5, bogeyAvoid, course, condition):
     # Get the initial score
-    score = roll_score(par, par3, par4, par5, bogeyAvoid, course, condition)
+    score = roll_score(par, hcp, par3, par4, par5, bogeyAvoid, course, condition)
 
     # Call reroll_if_needed if the score is par+1 or worse
     if score >= par + 1:
-        score = reroll_if_needed(score, par, golfer, par3, par4, par5, bogeyAvoid, course, condition)
+        score = reroll_if_needed(score, par, hcp, golfer, par3, par4, par5, bogeyAvoid, course, condition)
 
     return score
 
@@ -162,19 +173,8 @@ class Hole:
         self.par = par
         self.handicap = handicap
 
-def generate_score(golfer, par):
 
-    # Get the initial score
-    score = roll_score(par)
-
-    # Call reroll_if_needed if the score is par+1 or worse
-    if score >= par + 1:
-        score = reroll_if_needed(score, par, golfer)
-
-    return score
-
-
-def reroll_if_needed(score, par, golfer, par3, par4, par5, bogeyAvoid, course, condition):
+def reroll_if_needed(score, par, hcp, golfer, par3, par4, par5, bogeyAvoid, course, condition):
     global best_improvement, worst_improvement, best_golfer, worst_golfer
 
     if golfer.extra_rolls > 0:
@@ -187,7 +187,7 @@ def reroll_if_needed(score, par, golfer, par3, par4, par5, bogeyAvoid, course, c
         # Check if golfer can reroll par+1 (rating of 95 or more) or par+2 (all other players)
         if (score_diff >= 2 and random.random() <= chance * 2):
             original_score = score
-            score = roll_score(par, par3, par4, par5, bogeyAvoid, course, condition)
+            score = roll_score(par, hcp, par3, par4, par5, bogeyAvoid, course, condition)
             golfer.extra_rolls -= 1
             golfer.reroll_count += 1
             print(f"Reroll used: {golfer.name} - Rerolls used: {golfer.reroll_count} - Rerolls left: {golfer.extra_rolls} - Old: {original_score}  New: {score}")

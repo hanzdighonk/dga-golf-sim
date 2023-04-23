@@ -286,7 +286,9 @@ def initialize_tournament(tee_times, hole_pars):
             'r3': 0,
             'r4': 0,
             'strokes': 0,
-            'make_cut': 0
+            'make_cut': 0,
+            'winner': False,
+            'earnings': 0
         }
     return playerData, leaderboard
 
@@ -350,8 +352,11 @@ def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps,
                     hole_number = playerData[id]['current_hole']
                     human_input_scores(id, hole_number, playerData, rd)
                 else:
+                    hole_number = playerData[id]['current_hole']
+                    hcp = hole_handicaps[hole_number-1]
+
                     # Generate scores for the current golfer
-                    generate_scores(playerData, hole_pars, hole_handicaps, current_time, rd, activePlayers, golfer_instances, course_difficulty, course_condition, id)
+                    generate_scores(playerData, hole_pars, hcp, current_time, rd, activePlayers, golfer_instances, course_difficulty, course_condition, id)
 
 
         # Update the playerData of each id on the course
@@ -383,7 +388,7 @@ def simulate_round(tee_times, course_name, course_id, hole_pars, hole_handicaps,
 
 def human_input_scores(player_id, hole_number, playerData, rd):
     # Get user input for the hole score
-    hole_score = int(input(f"{playerData[player_id]['name']}: H{hole_number} score: "))
+    hole_score = verify_hole_score(player_id, hole_number, playerData)
 
     # Update the player's round and total scores
     playerData[player_id][f"r{rd}scores"].append((int(hole_number), hole_score))
@@ -393,7 +398,17 @@ def human_input_scores(player_id, hole_number, playerData, rd):
     playerData[player_id]["total_holes"] += 1
 
     
-    
+def verify_hole_score(player_id, hole_number, playerData):
+    while True:
+        try:
+            hole_score = int(input(f"{playerData[player_id]['name']} - H{hole_number} score: "))
+            if hole_score < 1 or hole_score > 12:
+                raise ValueError
+            break
+        except ValueError:
+            print("Please enter a valid score between 1 and 12.")
+    return hole_score
+  
 
 def projected_cutline(leaderboard, cut_line=65):
     sorted_leaderboard = sorted(leaderboard, key=lambda x: x['total'])
@@ -451,7 +466,7 @@ def generate_scores(playerData, hole_pars, hole_handicaps, current_time, rd, act
         hole_par = hole_pars[current_hole - 1]
 
         # Calculate the score for the current hole
-        hole_score = create_score(golfer_instance, hole_par, golfer_instance.par3, golfer_instance.par4, golfer_instance.par5, golfer_instance.bogeyAvoid, course_difficulty, course_condition)
+        hole_score = create_score(golfer_instance, hole_par, hole_handicaps, golfer_instance.par3, golfer_instance.par4, golfer_instance.par5, golfer_instance.bogeyAvoid, course_difficulty, course_condition)
 
         # Update the player's round and total scores
         playerData[player_id][f"r{rd}scores"].append((current_hole, hole_score))
@@ -722,9 +737,13 @@ def update_ranks(leaderboard):
         ranked_players.append(leaderboard[player_id])
     return ranked_players
 
-def print_header(header):
+def print_header(header, rd):
     # Format the header and print it
-    print('{:<5}{:<5}{:<27}{:<6}{:<10}{:<6}{:<4}{:<4}{:<4}{:<4}{:<7}'.format(*header))
+    if rd == 5:
+        print('{:<5}{:<5}{:<27}{:<6}{:<10}{:<6}{:<4}{:<4}{:<4}{:<4}{:<7}{:<10}'.format(*header))  
+    else:
+        print('{:<5}{:<5}{:<27}{:<6}{:<10}{:<6}{:<4}{:<4}{:<4}{:<4}{:<7}'.format(*header))
+    
     # Print a line of dashes to separate the header from the rest of the leaderboard
     print('-' * 82)
     
@@ -752,6 +771,8 @@ def print_player(player_id, leaderboard, playerData, rd):
     r4 = player['r4']
     strokes = player['strokes']
     makecut = playerData[player_id]['make_cut']
+    earnings = player['earnings']
+    formatted_earnings = "${:,.0f}".format(earnings)
 
     # If the total is 0, change it to "E" for even
     if total == 0:
@@ -786,7 +807,7 @@ def print_player(player_id, leaderboard, playerData, rd):
     elif rank_counts[rank] > 1:
         rank = f"T{rank}"
 
-    # Check an# Format the movement value with arrows or a dash
+    # Check and Format the movement value with arrows or a dash
     if rd == 1 or rd in (3, 4) and playerData[player_id]['make_cut'] == 0:
         movement_str = ""
     else:
@@ -798,7 +819,10 @@ def print_player(player_id, leaderboard, playerData, rd):
             movement_str = '-'
     
     
-    print(f"{rank:<5}{movement_str:<5}{player['player']:<27}{total:<6}{thru:<10}{round_scr:<6}{r1:<4}{r2:<4}{r3:<4}{r4:<4}{strokes:<7}")
+    if rd == 5:
+        print(f"{rank:<5}{movement_str:<5}{player['player']:<27}{total:<6}{thru:<10}{round_scr:<6}{r1:<4}{r2:<4}{r3:<4}{r4:<4}{strokes:<7}{formatted_earnings:<10}")
+    else:
+        print(f"{rank:<5}{movement_str:<5}{player['player']:<27}{total:<6}{thru:<10}{round_scr:<6}{r1:<4}{r2:<4}{r3:<4}{r4:<4}{strokes:<7}")
     
     
 def update_leaderboard_html(leaderboard, playerData, rd):
@@ -883,7 +907,7 @@ def print_top_half(made_cut, leaderboard, active_season, active_week, tournament
     header = ['Rank', '↑↓', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes']
 
     # Print the header and separator
-    print_header(header)
+    print_header(header, rd)
     
     for player_id, player_data in leaderboard.items():
         # If a player made the cut, add their data to the top_half dictionary
@@ -953,10 +977,12 @@ def print_leaderboard(leaderboard, active_season, active_week, tournament, purse
     print(f"Current Time: {day} - {formatted_time}\n")
 
     # Set the column header for the leaderboard
-    header = ['Rank', '↑↓', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes']
-
+    if rd == 5:
+        header = ['Rank', '↑↓', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes', 'Earnings']
+    else:
+        header = ['Rank', '↑↓', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes']
     # Print the header and separator
-    print_header(header)
+    print_header(header, rd)
 
     # Calculate the cut score and get the players who made the cut
     cut_score, made_cut = calculate_cut(leaderboard, hasCut, cutline)
@@ -972,11 +998,30 @@ def print_leaderboard(leaderboard, active_season, active_week, tournament, purse
                 print_projected_cutline(cut_score)
                 cutline_printed = True
     
-            print_player(player_id, leaderboard, playerData, rd)
+            print_player(player_id, leaderboard, playerData, rd)        
         else:
             print_player(player_id, leaderboard, playerData, rd)
 
+def final_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, playerData):
+        
+    # Print the season and week of the tournament
+    print(f"\nSeason: {active_season}\nWeek: {active_week}\n")
+    # Print the tournament name, course name, and total par
+    print(f"Tournament: {tournament}\nCourse: {course_name}\nPar: {total_par}\n\nPurse: {purse}\n")
 
+    # Set the column header for the leaderboard
+    header = ['Rank', '↑↓', 'Player', 'Total', 'Thru', 'Round', 'R1', 'R2', 'R3', 'R4', 'Strokes', 'Earnings']
+
+    # Print the header and separator
+    print_header(header, rd)
+
+    # Print the leaderboard for all players
+    counter = 0
+    cutline_printed = False
+    
+    for player_id, player_data in sorted(leaderboard.items(), key=lambda x: (-x[1]['make_cut'], x[1]['total'])):
+        print_player(player_id, leaderboard, playerData, rd)
+            
 
         
 def get_stats(scores_dict, hole_pars):
@@ -1091,11 +1136,11 @@ def reverse_field(tee_times):
 
     return dict(reverse_sorted_groups)
 
-def playoff(leaderboard, hole_pars, golfer_instances, course, condition):
+def playoff(leaderboard, hole_pars, hole_handicaps, golfer_instances, course, condition, playerData):
     # Check if there is a tie for first place
     first_place_score = next(player["total"] for player in leaderboard.values() if player["rank"] == 1)
     tied_players = [player for player in leaderboard.values() if player["total"] == first_place_score]
-
+    playoff_players = tied_players
 
     if len(tied_players) > 1:
         print("\nPlayoff needed!\n")
@@ -1109,7 +1154,14 @@ def playoff(leaderboard, hole_pars, golfer_instances, course, condition):
                 par4 = golfer.par4
                 par5 = golfer.par5
                 bogeyAvoid = golfer.bogeyAvoid
-                player["playoff_score"] = create_score(golfer, par, par3, par4, par5, bogeyAvoid, course, condition)
+                hcp = hole_handicaps[hole_number -1]
+                if playerData[id]['human']:
+                    human_input_scores(id, hole_number, playerData, rd)
+                else:
+                    hole_number = playerData[id]['current_hole']
+                    hcp = hole_handicaps[hole_number-1]
+                
+                player["playoff_score"] = create_score(golfer, par, hcp, par3, par4, par5, bogeyAvoid, course, condition)
 
             # Print the scores of all players in the playoff
             
@@ -1127,6 +1179,16 @@ def playoff(leaderboard, hole_pars, golfer_instances, course, condition):
             winner = tied_players[0]
             winner['rank'] = f"{winner['rank']}*"
             print(f"Playoff winner: {winner['player']}")
+            pid = tied_players[0]['player_id']
+            leaderboard[pid]['winner']=True
+            
+            # Update the rank and player_data rank of all non-winners to 2
+            for player in playoff_players:
+                if player['player_id'] != pid:
+                    playerData[player['player_id']]['rank'] = 2
+                    leaderboard[player['player_id']]['rank'] = 2
+            
+            
 
     return leaderboard
 
@@ -1135,6 +1197,79 @@ def reset_movement(field, rd):
         player_data['movement'] = 0
         player_data['start_rank'] = player_data['rank']
     return field
+
+
+def extract_numeric_rank(rank):
+    if isinstance(rank, int):
+        return rank
+
+    numeric_rank = ''.join(c for c in str(rank) if c.isdigit())
+    return int(numeric_rank)
+
+def leaderboard_sort_key(item):
+    player_id, player_data = item
+    return extract_numeric_rank(player_data['rank'])
+
+
+def calculate_payouts(leaderboard, purse):
+    payout_percentages = {
+        1: 0.18, 2: 0.109, 3: 0.069, 4: 0.049, 5: 0.041,
+        6: 0.03625, 7: 0.03375, 8: 0.03125, 9: 0.02925, 10: 0.02725,
+        11: 0.02525, 12: 0.02325, 13: 0.02125, 14: 0.01925, 15: 0.01825,
+        16: 0.01725, 17: 0.01625, 18: 0.01525, 19: 0.01425, 20: 0.01325,
+        21: 0.01225, 22: 0.01125, 23: 0.01045, 24: 0.00965, 25: 0.00885,
+        26: 0.00805, 27: 0.00775, 28: 0.00745, 29: 0.00715, 30: 0.00685,
+        31: 0.00655, 32: 0.00625, 33: 0.00595, 34: 0.0057, 35: 0.00545,
+        36: 0.0052, 37: 0.00495, 38: 0.00475, 39: 0.00455, 40: 0.00435,
+        41: 0.00415, 42: 0.00395, 43: 0.00375, 44: 0.00355, 45: 0.00335,
+        46: 0.00315, 47: 0.00295, 48: 0.00279, 49: 0.00265, 50: 0.00257,
+        51: 0.00251, 52: 0.00245, 53: 0.00241, 54: 0.00237, 55: 0.00235,
+        56: 0.00233, 57: 0.00231, 58: 0.00229, 59: 0.00227, 60: 0.00225,
+        61: 0.00223, 62: 0.00221, 63: 0.00219, 64: 0.00217, 65: 0.00215,
+        66: 0.00213, 67: 0.00211, 68: 0.00209, 69: 0.00207, 70: 0.00205,
+        71: 0.00203, 72: 0.00201, 73: 0.00199, 74: 0.00197, 75: 0.00195,
+        76: 0.00193, 77: 0.00191, 78: 0.00189, 79: 0.00187, 80: 0.00185,
+    }
+
+    # Count the number of players tied at each rank
+    tied_players = {}
+    for player_data in leaderboard.values():
+        rank = player_data['rank']
+        if rank not in tied_players:
+            tied_players[rank] = 0
+        tied_players[rank] += 1
+        
+    # Calculate the total payout for each rank
+    total_payouts = {rank: purse * percentage for rank, percentage in payout_percentages.items()}
+    last_payout_rank = max(total_payouts.keys())
+        
+    for player_id, player_data in sorted(leaderboard.items(), key=leaderboard_sort_key):
+        rank = player_data['rank']
+        made_cut = player_data['make_cut']
+        numeric_rank = extract_numeric_rank(rank)
+        
+        if made_cut:
+            if numeric_rank <= last_payout_rank:
+                tied_count = tied_players[rank]
+    
+                # Calculate the total payout for all tied players at this rank
+                total_payout_for_rank = sum([total_payouts.get(r, 0) for r in range(numeric_rank, numeric_rank + tied_count)])
+    
+                # Divide the total payout by the number of tied players
+                payout = total_payout_for_rank / tied_count
+                leaderboard[player_id]['earnings'] = payout
+            else:  # rank > 65
+                # Calculate the payout for players tied beyond position 65
+                last_payout_amount = total_payouts[last_payout_rank] / tied_players[last_payout_rank]
+                payout_difference = (numeric_rank - last_payout_rank) * 100
+                payout = last_payout_amount - payout_difference
+                leaderboard[player_id]['earnings'] = payout
+        else:
+            leaderboard[player_id]['earnings'] = 0
+
+
+    return leaderboard
+
 
 def main():
     made_cut = {}
@@ -1171,9 +1306,9 @@ def main():
     # initialize tournament    
     playerData, leaderboard = initialize_tournament(r1_tee_times, hole_pars)
     
-    #course_difficulty & condition
-    course_difficulty = 1
-    course_condition = 10
+    #course_difficulty & condition - Round 1
+    course_difficulty = 5
+    course_condition = 5
 
     
     # simulate r1
@@ -1185,9 +1320,9 @@ def main():
     input("Press any key to continue...")
     #print_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, 2, hasCut, cutline, activePlayers, playerData, sorted_players)
 
-    #course_difficulty & condition
-    course_difficulty = 1
-    course_condition = 10
+    #course_difficulty & condition - Round 2
+    course_difficulty = 5
+    course_condition = 5
 
 
     
@@ -1199,9 +1334,9 @@ def main():
          made_cut, missed_cut, leaderboard = process_cut(playerData, cutline, rd, leaderboard)      
 
 
-    #course_difficulty & condition
-    course_difficulty = 1
-    course_condition = 10
+    #course_difficulty & condition - Round 3
+    course_difficulty = 5
+    course_condition = 5
 
     
     # set tee times for r3
@@ -1223,9 +1358,9 @@ def main():
     input("Press any key to continue...")
 
 
-    #course_difficulty & condition
-    course_difficulty = 1
-    course_condition = 10
+    #course_difficulty & condition - Round 4
+    course_difficulty = 5
+    course_condition = 5
 
     # simulate r4
     playerData, activePlayers, leaderboard, html_leaderboard = simulate_round(r4_tee_times, course_name, tid, hole_pars, hole_handicaps, rd, playerData, tournament, purse, hasCut, cutline, made_cut, missed_cut, golfer_instances, course_difficulty, course_condition, leaderboard)
@@ -1237,10 +1372,21 @@ def main():
 
     if len(rank_1_players) > 1:
         # Call the playoff function with the sorted leaderboard
-        leaderboard = playoff(leaderboard, hole_pars, golfer_instances, course_difficulty, course_condition)
-
+        leaderboard = playoff(leaderboard, hole_pars, hole_handicaps, golfer_instances, course_difficulty, course_condition, playerData)
+    else:
+        # Set the winner variable of the player with rank 1 to True
+        for player_id, player_data in leaderboard.items():
+            if player_data['rank'] == 1:
+                leaderboard[player_id]['winner'] = True
+                break
+            
+    calculate_payouts(leaderboard, purse)
+    
+    rd+=1
     # Print the final leaderboard
     print("\nFinal Leaderboard:")
+    final_leaderboard(leaderboard, active_season, active_week, tournament, purse, course_name, total_par, rd, playerData)
+    
     #print(leaderboard)
 #    for player_id, player in leaderboard.items():
         #print(f"{player['rank']} - {player['player']} - {player['total']}")
